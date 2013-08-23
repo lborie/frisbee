@@ -89,6 +89,7 @@ public class MainActivity extends GdgActivity  {
 
 
     private boolean mFirstStart = false;
+    private SharedPreferences mPreferences;
 
     /**
      * Called when the activity is first created.
@@ -102,6 +103,7 @@ public class MainActivity extends GdgActivity  {
 		Log.i(LOG_TAG, "onCreate");
         setContentView(R.layout.activity_main);
 
+        mPreferences = getSharedPreferences("gdg", Context.MODE_PRIVATE);
 
         mDrawerAdapter = new DrawerAdapter(this);
         mDrawerContent.setAdapter(mDrawerAdapter);
@@ -140,8 +142,6 @@ public class MainActivity extends GdgActivity  {
                 }
             }
         });
-        getSupportActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
-        getSupportActionBar().setListNavigationCallbacks(mSpinnerAdapter, MainActivity.this);
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
@@ -174,9 +174,11 @@ public class MainActivity extends GdgActivity  {
                     mFirstStart = true;
                 }
 
-            Chapter homeGdg = getIntent().getParcelableExtra("selected_chapter");
-            MainGdgFragment.newInstance(homeGdg);
         }
+        Chapter homeGdg = getIntent().getParcelableExtra("selected_chapter");
+        Fragment f = MainGdgFragment.newInstance(homeGdg);
+        getFragmentManager().beginTransaction().replace(R.id.content_frame, f).commit();
+
     }
 
 

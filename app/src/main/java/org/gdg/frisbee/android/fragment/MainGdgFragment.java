@@ -95,6 +95,9 @@ public class MainGdgFragment extends RoboSherlockFragment implements ActionBar.O
         mViewPagerAdapter = new MyAdapter(getActivity(), getSherlockActivity().getSupportFragmentManager());
         mSpinnerAdapter = new ChapterAdapter(getActivity(), android.R.layout.simple_list_item_1);
 
+        getSherlockActivity().getSupportActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
+        getSherlockActivity().getSupportActionBar().setListNavigationCallbacks(mSpinnerAdapter, this);
+
         mFetchChaptersTask = mClient.getDirectory(new Response.Listener<Directory>() {
                                                       @Override
                                                       public void onResponse(final Directory directory) {
