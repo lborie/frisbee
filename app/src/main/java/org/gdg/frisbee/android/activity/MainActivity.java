@@ -56,6 +56,7 @@ import org.gdg.frisbee.android.api.model.Directory;
 import org.gdg.frisbee.android.cache.ModelCache;
 import org.gdg.frisbee.android.fragment.EventFragment;
 import org.gdg.frisbee.android.fragment.InfoFragment;
+import org.gdg.frisbee.android.fragment.MainGdgFragment;
 import org.gdg.frisbee.android.fragment.NewsFragment;
 import org.gdg.frisbee.android.utils.ChapterComparator;
 import org.gdg.frisbee.android.utils.GingerbreadLastLocationFinder;
@@ -70,7 +71,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-public class MainActivity extends GdgActivity implements ActionBar.OnNavigationListener {
+public class MainActivity extends GdgActivity  {
 
     private static String LOG_TAG = "GDG-MainActivity";
 
@@ -82,25 +83,12 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
     @InjectView(R.id.left_drawer)
     private ListView mDrawerContent;
 
-    @InjectView(R.id.pager)
-    private ViewPager mViewPager;
-
-    @InjectView(R.id.titles)
-    private TitlePageIndicator mIndicator;
-
     private DrawerAdapter mDrawerAdapter;
-    private ChapterAdapter mSpinnerAdapter;
-    private MyAdapter mViewPagerAdapter;
+
     private ActionBarDrawerToggleCompat mDrawerToggle;
-    private ApiRequest mFetchChaptersTask;
-    private SharedPreferences mPreferences;
-    private LocationManager mLocationManager;
-    private GroupDirectory mClient;
+
 
     private boolean mFirstStart = false;
-
-    private ChapterComparator mLocationComparator;
-
 
     /**
      * Called when the activity is first created.
@@ -114,29 +102,6 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
 		Log.i(LOG_TAG, "onCreate");
         setContentView(R.layout.activity_main);
 
-        mPreferences = getSharedPreferences("gdg", MODE_PRIVATE);
-
-        mClient = new GroupDirectory();
-
-        mLocationComparator = new ChapterComparator(mPreferences);
-
-        mIndicator.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-            @Override
-            public void onPageScrolled(int i, float v, int i2) {
-                //To change body of implemented methods use File | Settings | File Templates.
-            }
-
-            @Override
-            public void onPageSelected(int i) {
-                Log.d(LOG_TAG, "onPageSelected()");
-                trackViewPagerPage(i);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int i) {
-                //To change body of implemented methods use File | Settings | File Templates.
-            }
-        });
 
         mDrawerAdapter = new DrawerAdapter(this);
         mDrawerContent.setAdapter(mDrawerAdapter);
@@ -146,6 +111,8 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
                 DrawerAdapter.DrawerItem item = (DrawerAdapter.DrawerItem) mDrawerAdapter.getItem(i);
 
                 switch(item.getTitle()) {
+                    case R.string.home_gdg:
+                        break;
                     case R.string.achievements:
                         if(mPreferences.getBoolean(Const.SETTINGS_SIGNED_IN, false)) {
                             getPlayServicesHelper().getGamesClient(new PlayServicesHelper.OnGotGamesClientListener() {
@@ -173,9 +140,6 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
                 }
             }
         });
-
-        mViewPagerAdapter = new MyAdapter(this, getSupportFragmentManager());
-        mSpinnerAdapter = new ChapterAdapter(MainActivity.this, android.R.layout.simple_list_item_1);
         getSupportActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
         getSupportActionBar().setListNavigationCallbacks(mSpinnerAdapter, MainActivity.this);
 
@@ -202,79 +166,6 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
         };
         mDrawerLayout.setDrawerListener(mDrawerToggle);
 
-        mFetchChaptersTask = mClient.getDirectory(new Response.Listener<Directory>() {
-            @Override
-            public void onResponse(final Directory directory) {
-                getSupportActionBar().setListNavigationCallbacks(mSpinnerAdapter, MainActivity.this);
-                App.getInstance().getModelCache().putAsync("chapter_list", directory, DateTime.now().plusDays(1), new ModelCache.CachePutListener() {
-                    @Override
-                    public void onPutIntoCache() {
-                        ArrayList<Chapter> chapters = directory.getGroups();
-
-                        initChapters(chapters);
-                    }
-                });
-            }
-        }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError volleyError) {
-                Crouton.makeText(MainActivity.this, getString(R.string.fetch_chapters_failed), Style.ALERT).show();
-                Log.e(LOG_TAG, "Could'nt fetch chapter list", volleyError);
-            }
-        });
-
-        if(savedInstanceState == null) {
-
-            if(Utils.isOnline(this)) {
-                App.getInstance().getModelCache().getAsync("chapter_list", new ModelCache.CacheListener() {
-                    @Override
-                    public void onGet(Object item) {
-                        Directory directory = (Directory)item;
-                        initChapters(directory.getGroups());
-                    }
-
-                    @Override
-                    public void onNotFound(String key) {
-                        mFetchChaptersTask.execute();
-                    }
-                });
-            } else {
-
-                App.getInstance().getModelCache().getAsync("chapter_list", false, new ModelCache.CacheListener() {
-                    @Override
-                    public void onGet(Object item) {
-                        Directory directory = (Directory)item;
-                        initChapters(directory.getGroups());
-                    }
-
-                    @Override
-                    public void onNotFound(String key) {
-                        Crouton.makeText(MainActivity.this, getString(R.string.offline_alert), Style.ALERT).show();
-                    }
-                });
-            }
-        } else {
-
-            if(savedInstanceState.containsKey("chapters")) {
-                ArrayList<Chapter> chapters = savedInstanceState.getParcelableArrayList("chapters");
-                mSpinnerAdapter.clear();
-                mSpinnerAdapter.addAll(chapters);
-
-                if(savedInstanceState.containsKey("selected_chapter")) {
-                    Chapter selectedChapter = savedInstanceState.getParcelable("selected_chapter");
-                    mViewPagerAdapter.setSelectedChapter(selectedChapter);
-                    getSupportActionBar().setSelectedNavigationItem(mSpinnerAdapter.getPosition(selectedChapter));
-                } else {
-                    mViewPagerAdapter.setSelectedChapter(chapters.get(0));
-                }
-
-                mViewPager.setAdapter(mViewPagerAdapter);
-                mIndicator.setViewPager(mViewPager);
-            } else {
-                mFetchChaptersTask.execute();
-            }
-        }
-
         Intent intent = getIntent();
         if(intent != null && intent.getAction() != null && intent.getAction().equals("finish_first_start")) {
                 Log.d(LOG_TAG, "Completed FirstStartWizard");
@@ -283,55 +174,11 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
                     mFirstStart = true;
                 }
 
-                Chapter homeGdgd = getIntent().getParcelableExtra("selected_chapter");
-                getSupportActionBar().setSelectedNavigationItem(mSpinnerAdapter.getPosition(homeGdgd));
-                mViewPagerAdapter.setSelectedChapter(homeGdgd);
+            Chapter homeGdg = getIntent().getParcelableExtra("selected_chapter");
+            MainGdgFragment.newInstance(homeGdg);
         }
     }
 
-    private void initChapters(ArrayList<Chapter> chapters) {
-        addChapters(chapters);
-        Chapter chapter = null;
-
-        if(getIntent().hasExtra("org.gdg.frisbee.CHAPTER")) {
-            String chapterId = getIntent().getStringExtra("org.gdg.frisbee.CHAPTER");
-            for(Chapter c : chapters) {
-                if(c.getGplusId().equals(chapterId)) {
-                    chapter = c;
-                    break;
-                }
-            }
-            if(chapter == null)
-                chapter = chapters.get(0);
-        } else {
-            chapter = chapters.get(0);
-        }
-
-        getSupportActionBar().setSelectedNavigationItem(mSpinnerAdapter.getPosition(chapter));
-        mViewPager.setAdapter(mViewPagerAdapter);
-        mIndicator.setViewPager(mViewPager);
-    }
-
-    private void trackViewPagerPage(int position) {
-        if(mViewPager == null || mViewPagerAdapter.getSelectedChapter() == null)
-            return;
-
-        Log.d(LOG_TAG, "trackViewPagerPage()");
-        String page = "";
-
-        switch(position) {
-            case 0:
-                page = "News";
-                break;
-            case 1:
-                page = "Info";
-                break;
-            case 2:
-                page = "Events";
-                break;
-        }
-        App.getInstance().getTracker().sendView(String.format("/Main/%s/%s", mViewPagerAdapter.getSelectedChapter().getName().replaceAll(" ","-"), page));
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int responseCode, Intent intent) {
@@ -395,11 +242,6 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
         }
     }
 
-    private void addChapters(List<Chapter> chapterList) {
-        Collections.sort(chapterList, mLocationComparator);
-        mSpinnerAdapter.clear();
-        mSpinnerAdapter.addAll(chapterList);
-    }
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
@@ -440,8 +282,6 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
     protected void onResume() {
         super.onResume();
         Log.d(LOG_TAG, "onResume()");
-
-        trackViewPagerPage(mViewPager.getCurrentItem());
     }
 
     @Override
@@ -454,81 +294,7 @@ public class MainActivity extends GdgActivity implements ActionBar.OnNavigationL
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
-        if(mSpinnerAdapter.getCount() > 0)
-            outState.putParcelableArrayList("chapters", mSpinnerAdapter.getAll());
-        if(mViewPagerAdapter.getSelectedChapter() != null)
-            outState.putParcelable("selected_chapter", mViewPagerAdapter.getSelectedChapter());
     }
 
-    @Override
-    public boolean onNavigationItemSelected(int position, long l) {
-        Chapter previous = mViewPagerAdapter.getSelectedChapter();
-        mViewPagerAdapter.setSelectedChapter(mSpinnerAdapter.getItem(position));
-        if(previous == null || !previous.equals(mSpinnerAdapter.getItem(position))) {
-            Log.d(LOG_TAG, "Switching chapter!");
-            mViewPagerAdapter.notifyDataSetChanged();
-        }
-        return true;
-    }
-
-    public class MyAdapter extends FragmentStatePagerAdapter {
-        private Context mContext;
-        private Chapter mSelectedChapter;
-
-        public MyAdapter(Context ctx, FragmentManager fm) {
-            super(fm);
-            mContext = ctx;
-        }
-
-        @Override
-        public int getItemPosition(Object object) {
-            return POSITION_NONE;
-        }
-
-        @Override
-        public int getCount() {
-            if(mSelectedChapter == null)
-                return 0;
-            else
-                return 3;
-        }
-
-        @Override
-        public Fragment getItem(int position) {
-            switch(position) {
-                case 0:
-                    return NewsFragment.newInstance(mSelectedChapter.getGplusId());
-                case 1:
-                    return InfoFragment.newInstance(mSelectedChapter.getGplusId());
-                case 2:
-                    return EventFragment.newInstance(mSelectedChapter.getGplusId());
-            }
-            return null;
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            switch(position) {
-                case 0:
-                    return mContext.getText(R.string.news);
-                case 1:
-                    return mContext.getText(R.string.info);
-                case 2:
-                    return mContext.getText(R.string.events);
-            }
-            return "";
-        }
-
-        public Chapter getSelectedChapter() {
-            return mSelectedChapter;
-        }
-
-        public void setSelectedChapter(Chapter chapter) {
-            if(mSelectedChapter != null)
-                trackViewPagerPage(mViewPager.getCurrentItem());
-
-            this.mSelectedChapter = chapter;
-        }
-    }
 }
 
